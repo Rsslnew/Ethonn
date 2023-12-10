@@ -33,7 +33,7 @@ requirements = [
 setuptools.setup(
     name="ethon",
     version=ver,
-    author="vasusen-code",
+    author="Djangonew",
     description=desc,
     long_description=long_desc,
     long_description_content_type="text/markdown",
