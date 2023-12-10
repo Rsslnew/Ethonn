@@ -31,7 +31,7 @@ requirements = [
 
 
 setuptools.setup(
-    name="ethon",
+    name="Ethonn",
     version=ver,
     author="Djangonew",
     description=desc,
