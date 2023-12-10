@@ -9,7 +9,7 @@ with open("README.rst", "r", encoding="utf-8") as fh:
 
 desc = "Package containing basic functions to build telegram bots."
 GPL = "GNU AFFERO GENERAL PUBLIC LICENSE (v3)"
-git = "https://github.com/Djangonew/Ethonn"
+Git = "https://github.com/Djangonew/Ethonn"
 classify = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.6",
