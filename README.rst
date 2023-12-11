@@ -1,9 +1,6 @@
 ethon
 =====
 
-• Telegram_
-• Github_
-
 install
 =======
 
