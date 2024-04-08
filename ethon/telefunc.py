@@ -124,7 +124,7 @@ async def force_sub(client, channel, id, ft):
         else:
             s, r = False, None
     except UserNotParticipantError:
-        s, r = True, f"To use this bot you've to join @{channel}.\n\nAlso join @gafamousy"
+        s, r = True, f"To use this bot you've to join @{channel}.\n\nAlso join @neropublik"
     except Exception:
         s, r = True, "ERROR: Add in ForceSub channel, or check your channel id."
     return s, r
