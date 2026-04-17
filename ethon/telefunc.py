@@ -5,67 +5,68 @@ import time
 import asyncio
 
 from .FasterTg import upload_file, download_file
-
 from telethon.errors.rpcerrorlist import UserNotParticipantError
 from telethon.tl.functions.channels import GetParticipantRequest
+from main.plugins.userqueue import RUNNING
 
 
 # ───────────────────────── UTIL ─────────────────────────
 
 def time_formatter(milliseconds: int) -> str:
-    seconds, milliseconds = divmod(int(milliseconds), 1000)
+    seconds, _ = divmod(int(milliseconds), 1000)
     minutes, seconds = divmod(seconds, 60)
     hours, minutes = divmod(minutes, 60)
-    days, hours = divmod(hours, 24)
-    weeks, days = divmod(days, 7)
 
-    tmp = (
-        ((str(weeks) + "w:") if weeks else "")
-        + ((str(days) + "d:") if days else "")
-        + ((str(hours) + "h:") if hours else "")
-        + ((str(minutes) + "m:") if minutes else "")
-        + ((str(seconds) + "s") if seconds else "")
-    )
-    return tmp or "0s"
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
 
 
 def hbs(size):
     if not size:
         return "0 B"
 
-    power = 2 ** 10
-    raised_to_pow = 0
-    dict_power_n = {0: "B", 1: "KB", 2: "MB", 3: "GB", 4: "TB"}
+    power = 1024
+    units = ["B", "KB", "MB", "GB", "TB"]
 
-    while size > power and raised_to_pow < 4:
+    i = 0
+    size = float(size)
+
+    while size >= power and i < len(units) - 1:
         size /= power
-        raised_to_pow += 1
+        i += 1
 
-    return f"{round(size, 2)} {dict_power_n[raised_to_pow]}"
+    return f"{size:.2f} {units[i]}"
 
 
-# ───────────────────────── PROGRESS (FIXED) ─────────────────────────
+# ───────────────────────── PROGRESS (FINAL) ─────────────────────────
 
-_last_edit = {}  # anti spam per message
+_last_edit = {}
 
 
 async def progress(current, total, event, start, type_of_ps, file=None):
     now = time.time()
     diff = now - start
 
-    if diff == 0:
+    if diff <= 0:
         return
 
-    # throttle update tiap ~2 detik
-    key = id(event)
+    # pakai message id biar stabil
+    key = getattr(event, "id", id(event))
+
+    # throttle 2 detik
     if key in _last_edit and now - _last_edit[key] < 2:
         return
 
     _last_edit[key] = now
 
     try:
-        percentage = current * 100 / total
-        speed = current / diff
+        # CANCEL CHECK
+        user_id = getattr(event, "sender_id", None)
+        if user_id and user_id not in RUNNING:
+            return
+
+        percentage = (current * 100 / total) if total else 0
+        speed = current / diff if diff else 0
+
         eta = (total - current) / speed if speed > 0 else 0
 
         filled = int(percentage // 5)
@@ -73,7 +74,8 @@ async def progress(current, total, event, start, type_of_ps, file=None):
 
         text = (
             f"{type_of_ps}\n\n"
-            f"**[{bar}] {percentage:.2f}%**\n\n"
+            f"**{percentage:.2f}%**\n"
+            f"[{bar}]\n\n"
             f"📦 {hbs(current)} / {hbs(total)}\n"
             f"🚀 {hbs(speed)}/s\n"
             f"⏱️ ETA: {time_formatter(int(eta * 1000))}"
@@ -96,10 +98,14 @@ async def fast_upload(file, name, start_time, bot, event, msg):
             client=bot,
             file=f,
             filename=name,
-            progress_callback=lambda d, t: asyncio.get_event_loop().create_task(
+            progress_callback=lambda d, t: asyncio.create_task(
                 progress(d, t, event, start_time, msg, name)
             ),
         )
+
+    # cleanup memory
+    _last_edit.pop(getattr(event, "id", id(event)), None)
+
     return result
 
 
@@ -109,10 +115,14 @@ async def fast_download(filename, file, bot, event, start_time, msg):
             client=bot,
             location=file,
             out=fk,
-            progress_callback=lambda d, t: asyncio.get_event_loop().create_task(
+            progress_callback=lambda d, t: asyncio.create_task(
                 progress(d, t, event, start_time, msg, filename)
             ),
         )
+
+    # cleanup memory
+    _last_edit.pop(getattr(event, "id", id(event)), None)
+
     return result
 
 
@@ -120,6 +130,7 @@ async def fast_download(filename, file, bot, event, start_time, msg):
 
 async def force_sub(client, channel, id, ft):
     s, r = False, None
+
     try:
         x = await client(GetParticipantRequest(channel=channel, participant=int(id)))
         left = x.stringify()
