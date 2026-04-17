@@ -12,9 +12,28 @@ License can be found in < https://github.com/vasusen-code/ethon/blob/main/LICENS
 #vasusen-code/thechariotoflight/dronebots
 #__TG:ChauhanMahesh__
 from telethon import events
+import html
 
-#to mention
-async def mention(bot, id):
-    a = await bot.get_entity(int(id))
-    x = a.first_name
-    return f'[{x}](tg://user?id={id})'
+
+# ================= SAFE MENTION =================
+
+async def mention(bot, user_id):
+    """
+    Return mention user dalam format clickable
+    """
+    try:
+        entity = await bot.get_entity(int(user_id))
+
+        # Ambil nama terbaik
+        name = getattr(entity, "first_name", None) \
+            or getattr(entity, "title", None) \
+            or "User"
+
+        # Escape biar gak rusak markdown
+        name = html.escape(name)
+
+        return f'<a href="tg://user?id={user_id}">{name}</a>'
+
+    except Exception:
+        # fallback kalau gagal ambil entity
+        return f'<a href="tg://user?id={user_id}">User</a>'
