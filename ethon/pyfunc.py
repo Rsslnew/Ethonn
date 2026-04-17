@@ -1,22 +1,13 @@
-"""This file is part of the ethon distribution.
-Copyright (c) 2021 vasusen-code
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, version 3.
-This program is distributed in the hope that it will be useful, but
-WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-General Public License for more details.
-License can be found in < https://github.com/vasusen-code/ethon/blob/main/LICENSE > ."""
-
-#vasusen-code/thechariotoflight/dronebots
-#__TG:ChauhanMahesh__
- 
 import subprocess
 import json
 
+
 def bash(cmd):
-    process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    process = subprocess.Popen(
+        cmd, shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
     output, error = process.communicate()
     return output, error
 
@@ -26,88 +17,73 @@ def video_metadata(file):
         out = subprocess.check_output([
             "ffprobe",
             "-v", "quiet",
+            "-print_format", "json",
             "-show_format",
             "-show_streams",
+            file
+        ])
+
+        data = json.loads(out)
+
+        # ambil video stream pertama
+        stream = next(
+            (s for s in data.get("streams", []) if s.get("codec_type") == "video"),
+            {}
+        )
+
+        width = int(stream.get("width", 1280))
+        height = int(stream.get("height", 720))
+
+        duration = float(data.get("format", {}).get("duration", 0))
+        duration = int(duration)
+
+        return {
+            "width": width,
+            "height": height,
+            "duration": duration
+        }
+
+    except Exception as e:
+        print("video_metadata error:", e)
+        return {
+            "width": 1280,
+            "height": 720,
+            "duration": 0
+        }
+
+
+def total_frames(file):
+    try:
+        out = subprocess.check_output([
+            "ffprobe",
+            "-v", "quiet",
+            "-select_streams", "v:0",
+            "-count_frames",
+            "-show_entries", "stream=nb_read_frames",
             "-print_format", "json",
             file
         ])
+
         data = json.loads(out)
+        frames = int(data["streams"][0].get("nb_read_frames", 0))
+        return frames
 
-        stream = data['streams'][0]
-        width = int(stream.get('width', 1280))
-        height = int(stream.get('height', 720))
-        duration = int(float(data['format'].get('duration', 0)))
+    except Exception:
+        return 0
 
-        return {
-            'width': width,
-            'height': height,
-            'duration': duration
-        }
 
-    except Exception as e:
-        print("Error:", e)
-        return {
-            'width': 1280,
-            'height': 720,
-            'duration': 0
-        }
-
-# function to find the resolution of the input video file
-
-import subprocess
-import shlex
-import json
-
-def findVideoResolution(pathToInputVideo):
-    cmd = "ffprobe -v quiet -print_format json -show_streams"
-    args = shlex.split(cmd)
-    args.append(pathToInputVideo)
-    # run the ffprobe process, decode stdout into utf-8 & convert to JSON
-    ffprobeOutput = subprocess.check_output(args).decode('utf-8')
-    ffprobeOutput = json.loads(ffprobeOutput)
-
-    # find height and width
-    height = ffprobeOutput['streams'][0]['height']
-    width = ffprobeOutput['streams'][0]['width']
-
-    # find duration
-    out = subprocess.check_output(["ffprobe", "-v", "quiet", "-show_format", "-print_format", "json", pathToInputVideo])
-    ffprobe_data = json.loads(out)
-    duration_seconds = float(ffprobe_data["format"]["duration"])
-
-    return int(height), int(width), int(duration_seconds)
-
-def duration(pathToInputVideo):
-    out = subprocess.check_output(["ffprobe", "-v", "quiet", "-show_format", "-print_format", "json", pathToInputVideo])
-    ffprobe_data = json.loads(out)
-    duration_seconds = float(ffprobe_data["format"]["duration"])
-    return int(duration_seconds)
-  
-def video_metadata(file):
-    height = 720
-    width = 1280
-    duration = 0
+def duration(file):
     try:
-        height, width, duration = findVideoResolution(file)
-        if duration == 0:
-            data = videometadata(file)
-            duration = data["duration"]
-            if duration is None:
-                duration = 0
-    except Exception as e:
-        try: 
-            if 'height' in str(e):
-                data = videometadata(file)
-                height = data["height"]
-                width = data["width"]
-                duration = duration(file)
-                if duration == 0:
-                    data = videometadata(file)
-                    duration = data["duration"]
-                    if duration is None:
-                        duration = 0
-        except Exception as e:
-            print(e)
-            height, width, duration = 720, 1280, 0
-    data = {'width' : width, 'height' : height, 'duration' : duration }
-    return data
+        out = subprocess.check_output([
+            "ffprobe",
+            "-v", "quiet",
+            "-show_format",
+            "-print_format", "json",
+            file
+        ])
+
+        data = json.loads(out)
+        return int(float(data["format"]["duration"]))
+
+    except Exception:
+        return 0
