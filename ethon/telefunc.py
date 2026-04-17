@@ -1,4 +1,4 @@
-#idk
+# ethon/telefunc.py — FIXED VERSION (NO .size ERROR + SAFE MEDIA)
 
 import math
 import time
@@ -37,7 +37,7 @@ def hbs(size):
     return f"{size:.2f} {units[i]}"
 
 
-# ───────────────────────── PROGRESS (FINAL) ─────────────────────────
+# ───────────────────────── PROGRESS ─────────────────────────
 
 _last_edit = {}
 
@@ -49,10 +49,9 @@ async def progress(current, total, event, start, type_of_ps, file=None):
     if diff <= 0:
         return
 
-    # pakai message id biar stabil
     key = getattr(event, "id", id(event))
 
-    # throttle 2 detik
+    # throttle biar gak spam edit
     if key in _last_edit and now - _last_edit[key] < 2:
         return
 
@@ -66,7 +65,6 @@ async def progress(current, total, event, start, type_of_ps, file=None):
 
         percentage = (current * 100 / total) if total else 0
         speed = current / diff if diff else 0
-
         eta = (total - current) / speed if speed > 0 else 0
 
         filled = int(percentage // 5)
@@ -90,7 +88,24 @@ async def progress(current, total, event, start, type_of_ps, file=None):
         pass
 
 
-# ───────────────────────── FAST UPLOAD/DOWNLOAD ─────────────────────────
+# ───────────────────────── HELPER MEDIA FIX ─────────────────────────
+
+def _get_safe_media(file):
+    """
+    FIX UTAMA:
+    - Convert MessageMedia → Document
+    - Hindari error .size
+    """
+    try:
+        if hasattr(file, "document") and file.document:
+            return file.document
+    except Exception:
+        pass
+
+    return file
+
+
+# ───────────────────────── FAST UPLOAD ─────────────────────────
 
 async def fast_upload(file, name, start_time, bot, event, msg):
     with open(file, "rb") as f:
@@ -103,13 +118,18 @@ async def fast_upload(file, name, start_time, bot, event, msg):
             ),
         )
 
-    # cleanup memory
     _last_edit.pop(getattr(event, "id", id(event)), None)
 
     return result
 
 
+# ───────────────────────── FAST DOWNLOAD (FIXED) ─────────────────────────
+
 async def fast_download(filename, file, bot, event, start_time, msg):
+
+    # 🔥 finally
+    file = _get_safe_media(file)
+
     with open(filename, "wb") as fk:
         result = await download_file(
             client=bot,
@@ -120,7 +140,6 @@ async def fast_download(filename, file, bot, event, start_time, msg):
             ),
         )
 
-    # cleanup memory
     _last_edit.pop(getattr(event, "id", id(event)), None)
 
     return result
