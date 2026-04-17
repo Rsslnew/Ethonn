@@ -1,10 +1,15 @@
+#fixbug
+
 import subprocess
 import json
 
 
+# ───────────────────────── BASH ─────────────────────────
+
 def bash(cmd):
     process = subprocess.Popen(
-        cmd, shell=True,
+        cmd,
+        shell=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE
     )
@@ -12,30 +17,46 @@ def bash(cmd):
     return output, error
 
 
+# ───────────────────────── METADATA (FIXED) ─────────────────────────
+
 def video_metadata(file):
+    """
+    Ambil metadata video yang BENAR:
+    - pilih stream video (bukan audio / cover)
+    - fallback aman
+    - hanya 1x ffprobe (hemat & cepat)
+    """
     try:
         out = subprocess.check_output([
             "ffprobe",
             "-v", "quiet",
             "-print_format", "json",
-            "-show_format",
             "-show_streams",
+            "-show_format",
             file
         ])
 
         data = json.loads(out)
 
-        # ambil video stream pertama
-        stream = next(
-            (s for s in data.get("streams", []) if s.get("codec_type") == "video"),
-            {}
-        )
+        # cari video stream (bukan attached_pic)
+        v_stream = None
+        for s in data.get("streams", []):
+            if s.get("codec_type") == "video":
+                if not (s.get("disposition") or {}).get("attached_pic", 0):
+                    v_stream = s
+                    break
 
-        width = int(stream.get("width", 1280))
-        height = int(stream.get("height", 720))
+        # fallback kalau tidak ketemu
+        if not v_stream:
+            for s in data.get("streams", []):
+                if s.get("codec_type") == "video":
+                    v_stream = s
+                    break
 
-        duration = float(data.get("format", {}).get("duration", 0))
-        duration = int(duration)
+        width = int(v_stream.get("width", 1280)) if v_stream else 1280
+        height = int(v_stream.get("height", 720)) if v_stream else 720
+
+        duration = int(float(data.get("format", {}).get("duration", 0)))
 
         return {
             "width": width,
@@ -52,25 +73,7 @@ def video_metadata(file):
         }
 
 
-def total_frames(file):
-    try:
-        out = subprocess.check_output([
-            "ffprobe",
-            "-v", "quiet",
-            "-select_streams", "v:0",
-            "-count_frames",
-            "-show_entries", "stream=nb_read_frames",
-            "-print_format", "json",
-            file
-        ])
-
-        data = json.loads(out)
-        frames = int(data["streams"][0].get("nb_read_frames", 0))
-        return frames
-
-    except Exception:
-        return 0
-
+# ───────────────────────── OPTIONAL HELPERS ─────────────────────────
 
 def duration(file):
     try:
@@ -81,9 +84,7 @@ def duration(file):
             "-print_format", "json",
             file
         ])
-
         data = json.loads(out)
         return int(float(data["format"]["duration"]))
-
     except Exception:
         return 0
