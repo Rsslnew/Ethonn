@@ -12,31 +12,45 @@ License can be found in < https://github.com/vasusen-code/ethon/blob/main/LICENS
 #vasusen-code/thechariotoflight/dronebots
 #__TG:ChauhanMahesh__
  
-import cv2
+import subprocess
+import json
 
-#fastest way to get total number of frames in a video
-def total_frames(video_path):
-    cap = cv2.VideoCapture(f"{video_path}")
-    tf = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) 
-    return tf        
-
-#makes a subprocess handy
-def bash(cmd):    
-    bashCommand = f"{cmd}"
-    process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE) 
+def bash(cmd):
+    process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     output, error = process.communicate()
     return output, error
 
-#to get width, height and duration(in sec) of a video
-def videometadata(file):
-    vcap = cv2.VideoCapture(f'{file}')  
-    width = round(vcap.get(cv2.CAP_PROP_FRAME_WIDTH ))
-    height = round(vcap.get(cv2.CAP_PROP_FRAME_HEIGHT ))
-    fps = vcap.get(cv2.CAP_PROP_FPS)
-    frame_count = vcap.get(cv2.CAP_PROP_FRAME_COUNT)
-    duration = round(frame_count / fps)
-    data = {'width' : width, 'height' : height, 'duration' : duration }
-    return data
+
+def video_metadata(file):
+    try:
+        out = subprocess.check_output([
+            "ffprobe",
+            "-v", "quiet",
+            "-show_format",
+            "-show_streams",
+            "-print_format", "json",
+            file
+        ])
+        data = json.loads(out)
+
+        stream = data['streams'][0]
+        width = int(stream.get('width', 1280))
+        height = int(stream.get('height', 720))
+        duration = int(float(data['format'].get('duration', 0)))
+
+        return {
+            'width': width,
+            'height': height,
+            'duration': duration
+        }
+
+    except Exception as e:
+        print("Error:", e)
+        return {
+            'width': 1280,
+            'height': 720,
+            'duration': 0
+        }
 
 # function to find the resolution of the input video file
 
