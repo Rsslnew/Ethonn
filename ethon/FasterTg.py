@@ -243,7 +243,19 @@ async def upload_file(client, file, filename, progress_callback=None, user_id=No
     part_size = utils.get_appropriated_part_size(file_size) * 1024
     part_count = math.ceil(file_size / part_size)
 
-    await uploader._init_download(4, None, part_count, part_size)
+    uploader.senders = [
+    UploadSender(
+        client,
+        await uploader._create_sender(),
+        file_id,
+        part_count,
+        file_size > 10 * 1024 * 1024,
+        i,
+        4,
+        client.loop
+    )
+    for i in range(4)
+]
 
     for chunk in iter(lambda: file.read(part_size), b""):
 
