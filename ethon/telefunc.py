@@ -107,7 +107,11 @@ def _get_safe_media(file):
 
 # ───────────────────────── FAST UPLOAD ─────────────────────────
 
-async def fast_upload(file, name, start_time, bot, event, msg):
+async def fast_upload(file, name, start_time, bot, event, msg, user_id=None):
+
+    if not user_id:
+        user_id = getattr(event, "sender_id", None)
+
     with open(file, "rb") as f:
         result = await upload_file(
             client=bot,
@@ -116,7 +120,7 @@ async def fast_upload(file, name, start_time, bot, event, msg):
             progress_callback=lambda d, t: asyncio.create_task(
                 progress(d, t, event, start_time, msg, name)
             ),
-            user_id=user_id
+            user_id=user_id  # ✅ sekarang valid
         )
 
     _last_edit.pop(getattr(event, "id", id(event)), None)
