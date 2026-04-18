@@ -20,33 +20,37 @@ def bash(cmd):
 # ───────────────────────── METADATA (FIXED) ─────────────────────────
 
 def video_metadata(file):
-    """
-    Ambil metadata video yang BENAR:
-    - pilih stream video (bukan audio / cover)
-    - fallback aman
-    - hanya 1x ffprobe (hemat & cepat)
-    """
     try:
-        out = subprocess.check_output([
-            "ffprobe",
-            "-v", "quiet",
-            "-print_format", "json",
-            "-show_streams",
-            "-show_format",
-            file
-        ])
+        proc = subprocess.run(
+            [
+                "ffprobe",
+                "-v", "error",
+                "-print_format", "json",
+                "-show_streams",
+                "-show_format",
+                file
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
 
-        data = json.loads(out)
+        # Ffprobe
+        if proc.returncode != 0:
+            print("FFPROBE ERROR:")
+            print(proc.stderr)
+            raise Exception("ffprobe gagal")
 
-        # cari video stream (bukan attached_pic)
+        data = json.loads(proc.stdout)
+
         v_stream = None
+
         for s in data.get("streams", []):
             if s.get("codec_type") == "video":
                 if not (s.get("disposition") or {}).get("attached_pic", 0):
                     v_stream = s
                     break
 
-        # fallback kalau tidak ketemu
         if not v_stream:
             for s in data.get("streams", []):
                 if s.get("codec_type") == "video":
@@ -55,7 +59,6 @@ def video_metadata(file):
 
         width = int(v_stream.get("width", 1280)) if v_stream else 1280
         height = int(v_stream.get("height", 720)) if v_stream else 720
-
         duration = int(float(data.get("format", {}).get("duration", 0)))
 
         return {
@@ -66,12 +69,12 @@ def video_metadata(file):
 
     except Exception as e:
         print("video_metadata error:", e)
+
         return {
             "width": 1280,
             "height": 720,
             "duration": 0
         }
-
 
 # ───────────────────────── OPTIONAL HELPERS ─────────────────────────
 
