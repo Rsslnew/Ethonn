@@ -29,7 +29,7 @@ def safe_filename(name: str) -> str:
 async def download_from_youtube(url):
     ydl_opts = {
         "format": "best",
-        "outtmpl": "%(title)s.%(ext)s",
+        "outtmpl": "%(title).200s.%(ext)s",
         "noplaylist": True,
         "quiet": True,
         "no_warnings": True,
@@ -42,20 +42,16 @@ async def download_from_youtube(url):
 
         filename = f"{title}.{ext}"
 
-        # kalau nama asli beda (yt-dlp kadang ubah)
-        for f in os.listdir():
-            if f.startswith(title) and f.endswith(ext):
-                return f
-
+        filename = ydl.prepare_filename(info)
+            
         return filename
-
 
 # ================= GENERIC YTDL =================
 
 async def ytdl(url):
     ydl_opts = {
         "format": "best",
-        "outtmpl": "%(title)s.%(ext)s",
+        "outtmpl": "%(title).200s.%(ext)s",
         "quiet": True,
         "no_warnings": True,
     }
