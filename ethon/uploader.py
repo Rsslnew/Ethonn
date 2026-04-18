@@ -115,17 +115,21 @@ async def weburl(url):
     loop = asyncio.get_event_loop()
 
     def _download():
-        r = requests.get(url, allow_redirects=True, timeout=30)
-        filename = get_filename_from_cd(r.headers.get("content-disposition"))
+        with requests.get(url, stream=True, allow_redirects=True, timeout=30) as r:
+            r.raise_for_status()
 
-        if not filename:
-            filename = url.split("/")[-1].split("?")[0]
+            filename = get_filename_from_cd(r.headers.get("content-disposition"))
 
-        filename = safe_filename(filename or "file")
+            if not filename:
+                filename = url.split("/")[-1].split("?")[0]
 
-        with open(filename, "wb") as f:
-            f.write(r.content)
+            filename = safe_filename(filename or "file")
 
-        return filename
+            with open(filename, "wb") as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+
+        return filename  # ⬅️ ini juga harus di dalam function
 
     return await loop.run_in_executor(None, _download)
