@@ -116,6 +116,7 @@ async def fast_upload(file, name, start_time, bot, event, msg):
             progress_callback=lambda d, t: asyncio.create_task(
                 progress(d, t, event, start_time, msg, name)
             ),
+            user_id=user_id
         )
 
     _last_edit.pop(getattr(event, "id", id(event)), None)
@@ -124,12 +125,10 @@ async def fast_upload(file, name, start_time, bot, event, msg):
 
 
 # ───────────────────────── FAST DOWNLOAD (FIXED) ─────────────────────────
+async def fast_download(filename, file, bot, event, start_time, msg, user_id=None):
 
-async def fast_download(filename, file, bot, event, start_time, msg):
-
-    # 🔥 finally
     file = _get_safe_media(file)
-
+    
     with open(filename, "wb") as fk:
         result = await download_file(
             client=bot,
@@ -138,12 +137,12 @@ async def fast_download(filename, file, bot, event, start_time, msg):
             progress_callback=lambda d, t: asyncio.create_task(
                 progress(d, t, event, start_time, msg, filename)
             ),
+            user_id=user_id  # ✅ INI PENTING
         )
 
     _last_edit.pop(getattr(event, "id", id(event)), None)
 
     return result
-
 
 # ───────────────────────── FORCE SUB ─────────────────────────
 
