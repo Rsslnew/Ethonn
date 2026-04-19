@@ -1,61 +1,36 @@
+"""This file is part of the ethon distribution.
+Copyright (c) 2021 vasusen-code
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, version 3.
+This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+General Public License for more details.
+License can be found in < https://github.com/vasusen-code/ethon/blob/main/LICENSE > ."""
+
+#vasusen-code/thechariotoflight/dronebots
+#__TG:ChauhanMahesh__
+
 import os
 import pathlib
-import shutil
 
-
-# ================= SAFE RENAME =================
-
-def rename(source, output, overwrite=True):
-    """
-    Rename file dengan handling error & overwrite optional
-    """
-    try:
-        if not os.path.exists(source):
-            raise FileNotFoundError(f"Source tidak ditemukan: {source}")
-
-        if os.path.exists(output):
-            if overwrite:
-                os.remove(output)
-            else:
-                raise FileExistsError(f"Target sudah ada: {output}")
-
-        os.rename(source, output)
-        return output
-
-    except Exception as e:
-        print("Rename error:", e)
-        return None
-
-
-# ================= GET FILE EXTENSION =================
-
+#rename files
+def rename(source, output):
+    os.rename(source, output)
+    
+#get file extension using path of file
 def file_extension(file_path):
-    """
-    Ambil ekstensi file (.mp4, .mkv, dll)
-    """
-    try:
-        return pathlib.Path(file_path).suffix.lower()
-    except Exception:
-        return ""
+    extension = pathlib.Path(f'{file_path}').suffix 
+    return extension
 
-
-# ================= QUEUE LENGTH CHECK =================
-
+#make a list with limited length and check length
+#Limit = maximun length of the list
 def Q_length(List, limit):
-    """
-    Cek panjang queue
-    return:
-        - 'FULL' kalau melebihi limit
-        - jumlah item kalau masih aman
-    """
-    try:
-        length = len(List)
-
-        # FIX: sebelumnya salah logika (limit + 1)
-        if length >= int(limit):
-            return "FULL"
-
+    length = len(List)
+    if length > int(limit) + 1:
+        return 'FULL'
+    else:
         return length
+    
 
-    except Exception:
-        return 0

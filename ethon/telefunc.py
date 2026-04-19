@@ -1,13 +1,12 @@
-# ethon/telefunc.py — FIXED VERSION (NO .size ERROR + SAFE MEDIA)
+# ethon/telefunc.py — FINAL FIXED VERSION
 
-import math
+import os
 import time
-import asyncio
 
-from .FasterTg import upload_file, download_file
-from telethon.errors.rpcerrorlist import UserNotParticipantError
+from .FasterTg import download_file
+from telethon.errors.rpcerrorlist import UserNotParticipantError, MessageNotModifiedError
 from telethon.tl.functions.channels import GetParticipantRequest
-from main.plugins.userqueue import RUNNING
+from main.plugins.userqueue import RUNNING_TASK
 
 
 # ───────────────────────── UTIL ─────────────────────────
@@ -16,7 +15,6 @@ def time_formatter(milliseconds: int) -> str:
     seconds, _ = divmod(int(milliseconds), 1000)
     minutes, seconds = divmod(seconds, 60)
     hours, minutes = divmod(minutes, 60)
-
     return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
 
 
@@ -41,7 +39,6 @@ def hbs(size):
 
 _last_edit = {}
 
-
 async def progress(current, total, event, start, type_of_ps, file=None):
     now = time.time()
     diff = now - start
@@ -49,34 +46,37 @@ async def progress(current, total, event, start, type_of_ps, file=None):
     if diff <= 0:
         return
 
-    key = getattr(event, "id", id(event))
+    key = id(event)
 
     # throttle biar gak spam edit
-    if key in _last_edit and now - _last_edit[key] < 2:
+    if key in _last_edit and now - _last_edit[key] < 0.5:
         return
 
     _last_edit[key] = now
 
     try:
-        # CANCEL CHECK
-        user_id = getattr(event, "sender_id", None)
-        if user_id and user_id not in RUNNING:
-            return
-
         percentage = (current * 100 / total) if total else 0
-        speed = current / diff if diff else 0
+        percentage = min(100, percentage)
+
+        speed = current / diff if diff > 0 else 0
+        if speed <= 0:
+            speed = 1
+
         eta = (total - current) / speed if speed > 0 else 0
 
         filled = int(percentage // 5)
-        bar = "🟩" * filled + "⬜️" * (20 - filled)
+        bar = "█" * filled + "░" * (20 - filled)
+
+        frames = ["▱▱▱▱▱", "▰▱▱▱▱", "▰▰▱▱▱", "▰▰▰▱▱", "▰▰▰▰▱", "▰▰▰▰▰"]
+        frame = frames[int(time.time() * 2) % len(frames)]
 
         text = (
             f"{type_of_ps}\n\n"
-            f"**{percentage:.2f}%**\n"
-            f"[{bar}]\n\n"
-            f"📦 {hbs(current)} / {hbs(total)}\n"
-            f"🚀 {hbs(speed)}/s\n"
-            f"⏱️ ETA: {time_formatter(int(eta * 1000))}"
+            f"{frame} **{percentage:.2f}%**\n"
+            f"{bar}\n\n"
+            f"📦 `{hbs(current)} / {hbs(total)}`\n"
+            f"🚀 `{hbs(speed)}/s`\n"
+            f"⏱️ `{time_formatter(int(eta * 1000))}`"
         )
 
         if file:
@@ -84,69 +84,65 @@ async def progress(current, total, event, start, type_of_ps, file=None):
 
         await event.edit(text)
 
-    except Exception:
+    except MessageNotModifiedError:
+        pass
+    except:
         pass
 
 
-# ───────────────────────── HELPER MEDIA FIX ─────────────────────────
+# ───────────────────────── MEDIA FIX ─────────────────────────
 
 def _get_safe_media(file):
-    """
-    FIX UTAMA:
-    - Convert MessageMedia → Document
-    - Hindari error .size
-    """
     try:
         if hasattr(file, "document") and file.document:
             return file.document
-    except Exception:
+    except:
         pass
-
     return file
 
 
-# ───────────────────────── FAST UPLOAD ─────────────────────────
+# ───────────────────────── FAST DOWNLOAD ─────────────────────────
 
-async def fast_upload(file, name, start_time, bot, event, msg, user_id=None):
-
-    if not user_id:
-        user_id = getattr(event, "sender_id", None)
-
-    with open(file, "rb") as f:
-        result = await upload_file(
-            client=bot,
-            file=f,
-            filename=name,
-            progress_callback=lambda d, t: asyncio.create_task(
-                progress(d, t, event, start_time, msg, name)
-            ),
-            user_id=user_id  # ✅ sekarang valid
-        )
-
-    _last_edit.pop(getattr(event, "id", id(event)), None)
-
-    return result
-
-
-# ───────────────────────── FAST DOWNLOAD (FIXED) ─────────────────────────
 async def fast_download(filename, file, bot, event, start_time, msg, user_id=None):
 
     file = _get_safe_media(file)
-    
+
     with open(filename, "wb") as fk:
         result = await download_file(
             client=bot,
             location=file,
             out=fk,
-            progress_callback=lambda d, t: asyncio.create_task(
-                progress(d, t, event, start_time, msg, filename)
+            progress_callback=lambda d, t: progress(
+                d, t, event, start_time, msg, filename
             ),
-            user_id=user_id  # ✅ INI PENTING
+            user_id=user_id
         )
 
-    _last_edit.pop(getattr(event, "id", id(event)), None)
+    _last_edit.pop(id(event), None)
 
     return result
+
+
+# ───────────────────────── FAST UPLOAD (FIX PALING PENTING) ─────────────────────────
+
+async def fast_upload(file, name, start_time, bot, event, msg, user_id=None):
+
+    size = os.path.getsize(file)
+
+    with open(file, "rb") as f:
+        result = await bot.upload_file(
+            f,
+            file_name=name,
+            file_size=size,
+            progress_callback=lambda d, t: progress(
+                d, t, event, start_time, msg, name
+            )
+        )
+
+    _last_edit.pop(id(event), None)
+
+    return result
+
 
 # ───────────────────────── FORCE SUB ─────────────────────────
 
@@ -165,7 +161,7 @@ async def force_sub(client, channel, id, ft):
     except UserNotParticipantError:
         s, r = True, f"To use this bot you've to join @{channel}"
 
-    except Exception:
+    except:
         s, r = True, "ERROR: ForceSub config invalid."
 
     return s, r
